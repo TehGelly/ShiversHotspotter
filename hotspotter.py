@@ -157,17 +157,6 @@ def process_all_files()-> None:
                 print(file)
                 process_script(join(".","shivers-win-1.02","src",file))
 
-def append_new_picture(ressci: bytes, rname: int, rdata: bytes) -> bytes:
-    #generate header for data
-    header = b''
-    header += b'\x01' #picture type
-    header += rname.to_bytes(2,'little') #resource name
-    header += len(rdata).to_bytes(4,'little') #size post-compression
-    header += len(rdata).to_bytes(4,'little') #size pre-compression
-    header += b'\x00' #uncompressed type
-    assert len(header) == 12
-    return ressci + header + rdata
-
 def replace_picture(ressci: bytes, rname: int, raddr: int, file: str) -> bytes:
     header = ressci[raddr:raddr+12]
     compressed_size = int.from_bytes(header[3:7],'little')
@@ -194,32 +183,6 @@ def replace_picture(ressci: bytes, rname: int, raddr: int, file: str) -> bytes:
     new_entry = new_header + candout + b'\x00'*(compressed_size-len(candout))
     return ressci[:raddr] + new_entry + ressci[raddr+len(new_entry):]
 
-def generate_resources_append() -> None:
-    with open("RESMAP.000",'rb') as f:
-        resmap = bytearray(f.read())
-    with open("RESSCI.000",'rb') as f:
-        ressci = bytearray(f.read())
-           
-    file_list = [f for f in listdir(join(".","processed_p56s")) if f.endswith(".p56")]
-    #starting at 4375 (this value will not change, since we're only modifying files)
-    for entry in range(4375,17689,6):
-        #go through each entry, and if the file is in the processed list, append and change address
-        resource = int.from_bytes(resmap[entry:entry+2],'little')
-        candfile = "{}.p56".format(resource)
-        if candfile in file_list:
-            print("{} found!".format(candfile))
-            address = len(ressci)
-            with open(join(".\\processed_p56s",candfile),'rb') as f:
-                ressci = append_new_picture(ressci, resource, f.read())
-            resmap[entry+2:entry+6] = address.to_bytes(4,'little')
-           
-    # easy peasy! just write out the files from here
-    with open("newRESMAP.000",'wb') as f:
-        f.write(resmap)
-    with open("newRESSCI.000",'wb') as f:
-        f.write(ressci)
-    return
-
 def generate_resources_replace() -> None:
     with open("RESMAP.000",'rb') as f:
         resmap = bytearray(f.read())
@@ -240,66 +203,7 @@ def generate_resources_replace() -> None:
     with open("newRESSCI.000",'wb') as f:
         f.write(ressci)
     return
-
-def unpack_LZS(data : bytes) -> bytes:
-    stream = ConstBitStream(data)
-    output = b''
-    while stream:
-        if stream.read('uint:1'): #compressed bytes follow
-            #print("#decompressing...")
-            if stream.read('uint:1'): #seven bit offset follows
-                offset = stream.read('uint:7')
-                if not offset:
-                    break
-            else:
-                offset = stream.read('uint:11')
-            clen = getCompLen_LZS(stream)
-            if not clen:
-                #return output
-                raise Exception("hey idiot, your clen is 0. seeking at {}".format(stream.bitpos))
-            output = copyComp_LZS(output, offset, clen)
-            #print("##offset={},clen={}".format(offset,clen))
-            #print(output.hex())
-        else: #uncompressed byte here
-            uncbyte = stream.read('bytes1')
-            output += uncbyte
-            #print("#literal byte = {}".format(uncbyte))
-            #print(output.hex())
-    return output
-
-
-def getCompLen_LZS(stream : ConstBitStream) -> int:
-    match stream.read('uint:2'):
-        case 0:
-            return 2
-        case 1:
-            return 3
-        case 2:
-            return 4
-        case _:
-            match stream.read('uint:2'):
-                case 0:
-                    return 5
-                case 1:
-                    return 6
-                case 2:
-                    return 7
-                case _:
-                    clen = 8
-                    while True:
-                        nibble = stream.read('uint:4')
-                        clen += nibble
-                        if nibble != 0xf:
-                            break
-                    return clen
-
-def copyComp_LZS(output : bytes, offset : int, clen : int) -> bytes:
-    #we go back x bytes in the output
-    while clen:
-        output += output[len(output)-offset:len(output)-offset+1]
-        clen -= 1
-        offset += 1
-    return output
                 
 if __name__ == '__main__':
-    print("kiss my ass")
+    process_all_files()
+    generate_from_processed()
