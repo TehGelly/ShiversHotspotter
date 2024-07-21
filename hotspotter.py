@@ -17,7 +17,7 @@ def parse_instance(lines: List[str]) -> list:
     #hacky way of determining predefined exitfeature instances is by name
     #TODO: implement proper checking of param earlier in script
     if any(name in lines[0] for name in
-             ['efExitRight', 'efExitTurn180']:
+             ['efExitRight', 'efExitTurn180']):
         nsLeft = 244
         nsTop = 0
         nsRight = 264
@@ -41,8 +41,9 @@ def parse_instance(lines: List[str]) -> list:
         elif 'nsBottom' in line:
             nsBottom = int(line.split(' ')[-1])
         elif 'createPoly' in line:
-            point_string = line.split(':')[-1].replace(')','')
-                                            .lstrip().rstrip()
+            point_string = line.split(':')[-1] \
+                           .replace(')','') \
+                           .lstrip().rstrip()
             point_ints = [int(a) for a in point_string.split(' ')]
             poly = [(point_ints[i],point_ints[i+1])
                     for i in range(0,len(point_ints)-2,2)]
@@ -175,15 +176,13 @@ def replace_picture(ressci: bytes, rname: int, raddr: int, file: str) -> bytes:
     if len(candout) > compressed_size:
         print("Unable to replace: new size is {}, old size is {}, diff = {}"
               .format(len(candout),compressed_size,len(candout)-compressed_size))
-        with open("replace.log","a") as f:
-            f.write("{}\n".format(rname))
         return ressci
     #otherwise, we can construct the new entry!
     new_header = header[:3] + len(candout).to_bytes(4,'little') + header[7:] + b'\x00'
     new_entry = new_header + candout + b'\x00'*(compressed_size-len(candout))
     return ressci[:raddr] + new_entry + ressci[raddr+len(new_entry):]
 
-def generate_resources_replace() -> None:
+def generate_from_processed() -> None:
     with open("RESMAP.000",'rb') as f:
         resmap = bytearray(f.read())
     with open("RESSCI.000",'rb') as f:
